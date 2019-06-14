@@ -32,6 +32,7 @@ class DiscordPier(private val bridge: Bridge) : Pier {
     private val webhookMap = HashMap<String, WebhookClient>()
     private var botAvatarUrl: String? = null
     private lateinit var discordApi: JDA
+    var lastMsg = ""
 
     override fun start() {
         logger.info("Connecting to Discord API...")
@@ -138,7 +139,13 @@ class DiscordPier(private val bridge: Bridge) : Pier {
 
     private fun sendMessageWebhook(guild: Guild, webhook: WebhookClient, msg: Message) {
         // try and get avatar for matching user
-        var avatarUrl: String? = null
+
+        if(lastMsg == msg.contents){
+            return
+        }else{
+            lastMsg = msg.contents
+        }
+        var avatarUrl: String? = "https://i.imgur.com/DgLp2X3.jpg"
         val matchingUsers = guild.getMembersByEffectiveName(msg.sender.displayName, true)
         if (matchingUsers != null && matchingUsers.isNotEmpty()) {
             avatarUrl = matchingUsers.first().user.avatarUrl
@@ -149,6 +156,34 @@ class DiscordPier(private val bridge: Bridge) : Pier {
         if (msg.sender == BOT_SENDER) {
             senderName = guild.getMember(discordApi.selfUser)?.effectiveName ?: senderName
             avatarUrl = botAvatarUrl ?: avatarUrl
+        }
+
+        when(senderName){
+            ("MCO_Telegram") -> {
+                avatarUrl = "https://telegram.org/img/t_logo.png"
+                val tgName = msg.contents.substring(msg.contents.indexOf('<') + 1, msg.contents.indexOf('>'))
+                msg.contents = msg.contents.replace("<" + tgName + ">", "", false)
+                senderName = tgName
+            }
+            ("McObot") -> {
+                    // if player is ingame
+                    if (msg.contents.contains("(MCS) <")) {
+                        val ingameName = msg.contents.substring(msg.contents.indexOf('<') + 1, msg.contents.indexOf('>'))
+                        msg.contents = msg.contents.replace("(MCS) <" + ingameName + ">", "",false)
+                        avatarUrl = "http://minecraftonline.com/cgi-bin/getplayerhead.sh?" + ingameName + "&128"
+                        senderName = ingameName
+
+                        // if player is ingame and uses /me
+                    } else if (msg.contents.contains("(MCS) *")) {
+
+                        val ingameName = msg.contents.substring(msg.contents.indexOf("*")+2, msg.contents.indexOf(msg.contents.split(' ')[1]))
+                        msg.contents = msg.contents.replace("(MCS) * " + ingameName,"", false)
+                        avatarUrl = "http://minecraftonline.com/cgi-bin/getplayerhead.sh?" + ingameName +"&128"
+                        senderName = ingameName
+                    }else{
+                        avatarUrl = botAvatarUrl
+                    }
+            }
         }
 
         val message = WebhookMessageBuilder()

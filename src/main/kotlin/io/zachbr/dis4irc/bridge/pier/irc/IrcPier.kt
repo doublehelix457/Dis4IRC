@@ -27,6 +27,7 @@ class IrcPier(private val bridge: Bridge) : Pier {
     private lateinit var ircConn: Client
     private var antiPing: Boolean = false
     private var noPrefix: Pattern? = null
+    var lastMsg = ""
 
     override fun start() {
         logger.info("Connecting to IRC Server")
@@ -79,9 +80,16 @@ class IrcPier(private val bridge: Bridge) : Pier {
     }
 
     override fun sendMessage(targetChan: String, msg: Message) {
+
         if (!this::ircConn.isInitialized) {
             logger.error("IRC Connection has not been initialized yet!")
             return
+        }
+
+        if(lastMsg == msg.contents){
+            return
+        }else{
+            lastMsg = msg.contents
         }
 
         val channel = getChannelByName(targetChan)
@@ -106,7 +114,7 @@ class IrcPier(private val bridge: Bridge) : Pier {
             if (noPrefixPattern == null || !noPrefixPattern.matcher(ircMsgOut).find()) {
                 ircMsgOut = "$senderPrefix$line"
             } else if (bridge.config.irc.announceForwardedCommands) {
-                channel.sendMessage("Forwarded command from ${getDisplayName(msg.sender.displayName)}")
+                channel.sendMessage("${getDisplayName(msg.sender.displayName)}$line")
             }
 
             channel.sendMultiLineMessage(ircMsgOut)
